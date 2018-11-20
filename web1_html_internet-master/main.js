@@ -2,37 +2,39 @@ var http = require('http');
 var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
-
-// 탬플릿 정의 함수 => 매개변수를 받아 하나하나 출력
-function templateHTML(title, list, body, control) {
-  return `
-  <!doctype html>
-  <html>
-  <head>
-    <title>WEB1 - ${title}</title>
-    <meta charset="utf-8">
-  </head>
-  <body>
-    <h1><a href="/">WEB</a></h1>
-    ${list}
-    ${control}
-    ${body}
-  </body>
-  </html>
-  `;
-}
-// 파일 입출력으로 현재 파일에 대한 목록 가져옴
-function templateList(filelist) {
-  var list = '<ul>';
-  var i = 0;
-  while (i < filelist.length) {
-    // 여기서 /?id=${파일이름}으로 id값 보내줌
-    list = list + `<li><a href="/?id=${filelist[i]}">${filelist[i]}</a></li>`;
-    i = i + 1;
+//refactoring
+var template = {
+  // 탬플릿 정의 함수 => 매개변수를 받아 하나하나 출력
+   HTML:function (title, list, body, control) {
+    return `
+    <!doctype html>
+    <html>
+    <head>
+      <title>WEB1 - ${title}</title>
+      <meta charset="utf-8">
+    </head>
+    <body>
+      <h1><a href="/">WEB</a></h1>
+      ${list}
+      ${control}
+      ${body}
+    </body>
+    </html>
+    `;
+  },
+  list: function (filelist) {
+    var list = '<ul>';
+    var i = 0;
+    while (i < filelist.length) {
+      // 여기서 /?id=${파일이름}으로 id값 보내줌
+      list = list + `<li><a href="/?id=${filelist[i]}">${filelist[i]}</a></li>`;
+      i = i + 1;
+    }
+    list = list + '</ul>';
+    return list;
   }
-  list = list + '</ul>';
-  return list;
 }
+
 
 //여기서 작업이 진행
 var app = http.createServer((request, response) => {
@@ -41,9 +43,9 @@ var app = http.createServer((request, response) => {
   var queryData = url.parse(_url, true).query; // url의 쿼리문을 배열 형식으로 가져옴 ex) { id: 'Javascript'}
   var pathname = url.parse(_url, true).pathname; // ex) /create
 
-  console.log(_url);
-  console.log(queryData);
-  console.log(pathname);
+  // console.log(_url);
+  // console.log(queryData);
+  // console.log(pathname);
 
   //index 메인
   if (pathname === '/') {
@@ -51,13 +53,13 @@ var app = http.createServer((request, response) => {
       fs.readdir('./data', (error, filelist) => {
         var title = 'Welcome';
         var description = 'Hello, Node.js';
-        var list = templateList(filelist);
-        var template = templateHTML(title, list,
+        var list = template.list(filelist);
+        var html = template.HTML(title, list,
           `<h2>${title}</h2>${description}`,
           `<a href="/create">create</a>`
         );
         response.writeHead(200);
-        response.end(template);
+        response.end(html);
       });
     }
     //filelist에서 보내준 id값
@@ -65,8 +67,8 @@ var app = http.createServer((request, response) => {
       fs.readdir('./data', (error, filelist) => {
         fs.readFile(`data/${queryData.id}`, 'utf8', (err, description) => {
           var title = queryData.id;
-          var list = templateList(filelist);
-          var template = templateHTML(title, list,
+          var list = template.list(filelist);
+          var html = template.HTML(title, list,
             `<h2>${title}</h2>${description}`,
             `<a href="/create">create</a> 
               <a href="/update?id=${title}">update</a>
@@ -76,7 +78,7 @@ var app = http.createServer((request, response) => {
               </form>`
           );
           response.writeHead(200);
-          response.end(template);
+          response.end(html);
         });
       });
     }
@@ -84,8 +86,8 @@ var app = http.createServer((request, response) => {
   else if (pathname === '/create') {
     fs.readdir('./data', (error, filelist) => {
       var title = 'WEB - create';
-      var list = templateList(filelist);
-      var template = templateHTML(title, list, `
+      var list = template.list(filelist);
+      var html = template.HTML(title, list, `
           <form action="/create_process" method="post">
             <p><input type="text" name="title" placeholder="title"></p>
             <p>
@@ -97,17 +99,23 @@ var app = http.createServer((request, response) => {
           </form>
         `, '');
       response.writeHead(200);
-      response.end(template);
+      response.end(html);
     });
   } else if (pathname === '/create_process') {
     var body = '';
+    // request.on 으로 클라이언트로 부터 보내진 데이터 값을 받아 body에 입력
     request.on('data', (data) => {
       body = body + data;
+      // console.log(data);
     });
     request.on('end', () => {
       var post = qs.parse(body);
       var title = post.title;
       var description = post.description;
+
+      // console.log("post : ",post);
+      // console.log("post.title : ",title);
+      // console.log("description : ",post.description);
       //파일을 create 하고 id=${title}로 이동
       fs.writeFile(`data/${title}`, description, 'utf8', (err) => {
         response.writeHead(302, { Location: `/?id=${title}` });
@@ -118,8 +126,8 @@ var app = http.createServer((request, response) => {
     fs.readdir('./data', (error, filelist) => {
       fs.readFile(`data/${queryData.id}`, 'utf8', (err, description) => {
         var title = queryData.id;
-        var list = templateList(filelist);
-        var template = templateHTML(title, list,
+        var list = template.list(filelist);
+        var html = template.HTML(title, list,
           //hidden 속성을 통해 수정되지 않은 원래 name의 값을 가져올수 있음
           `
             <form action="/update_process" method="post">
@@ -136,7 +144,7 @@ var app = http.createServer((request, response) => {
           `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
         );
         response.writeHead(200);
-        response.end(template);
+        response.end(html);
       });
     });
   } else if (pathname === '/update_process') {
@@ -151,7 +159,7 @@ var app = http.createServer((request, response) => {
 In order to actually serve requests, the listen method needs to be called on the server object. In most cases, all you'll need to pass to listen is the port number you want the server to listen on. There are some other options too, so consult the API reference.
 */
 
-    c('data', (data) => {
+    request.on('data', (data) => {
       body = body + data;
     });
     request.on('end', () => {
