@@ -2,39 +2,8 @@ var http = require('http');
 var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
-//refactoring
-var template = {
-  // 탬플릿 정의 함수 => 매개변수를 받아 하나하나 출력
-   HTML:function (title, list, body, control) {
-    return `
-    <!doctype html>
-    <html>
-    <head>
-      <title>WEB1 - ${title}</title>
-      <meta charset="utf-8">
-    </head>
-    <body>
-      <h1><a href="/">WEB</a></h1>
-      ${list}
-      ${control}
-      ${body}
-    </body>
-    </html>
-    `;
-  },
-  list: function (filelist) {
-    var list = '<ul>';
-    var i = 0;
-    while (i < filelist.length) {
-      // 여기서 /?id=${파일이름}으로 id값 보내줌
-      list = list + `<li><a href="/?id=${filelist[i]}">${filelist[i]}</a></li>`;
-      i = i + 1;
-    }
-    list = list + '</ul>';
-    return list;
-  }
-}
-
+var template = require('./lib/template.js');
+var path = require('path');
 
 //여기서 작업이 진행
 var app = http.createServer((request, response) => {
@@ -51,6 +20,7 @@ var app = http.createServer((request, response) => {
   if (pathname === '/') {
     if (queryData.id === undefined) {
       fs.readdir('./data', (error, filelist) => {
+
         var title = 'Welcome';
         var description = 'Hello, Node.js';
         var list = template.list(filelist);
@@ -65,18 +35,26 @@ var app = http.createServer((request, response) => {
     //filelist에서 보내준 id값
     else {
       fs.readdir('./data', (error, filelist) => {
-        fs.readFile(`data/${queryData.id}`, 'utf8', (err, description) => {
+        // 보안 이슈
+        filteredId = path.parse(queryData.id).base;
+        fs.readFile(`data/${filteredId}`, 'utf8', (err, description) => {
+
           var title = queryData.id;
+          var sanitizedTitle = sanitizeHtml(title);
+          var sanitizedDescription = sanitizeHtml(description, {
+            allowedTags: ['h1']
+          });
           var list = template.list(filelist);
-          var html = template.HTML(title, list,
-            `<h2>${title}</h2>${description}`,
-            `<a href="/create">create</a> 
-              <a href="/update?id=${title}">update</a>
-              <form action="delete_process" method="post">
-                <input type="hidden" name="id" value="${title}">
-                <input type="submit" value="delete">
-              </form>`
+          var html = template.HTML(sanitizedTitle, list,
+            `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`,
+            ` <a href="/create">create</a>
+                <a href="/update?id=${sanitizedTitle}">update</a>
+                <form action="delete_process" method="post">
+                  <input type="hidden" name="id" value="${sanitizedTitle}">
+                  <input type="submit" value="delete">
+                </form>`
           );
+
           response.writeHead(200);
           response.end(html);
         });
@@ -124,7 +102,8 @@ var app = http.createServer((request, response) => {
     });
   } else if (pathname === '/update') {
     fs.readdir('./data', (error, filelist) => {
-      fs.readFile(`data/${queryData.id}`, 'utf8', (err, description) => {
+      filteredId = path.parse(queryData.id).base;
+      fs.readFile(`data/${filteredId}`, 'utf8', (err, description) => {
         var title = queryData.id;
         var list = template.list(filelist);
         var html = template.HTML(title, list,
@@ -150,15 +129,6 @@ var app = http.createServer((request, response) => {
   } else if (pathname === '/update_process') {
     var body = '';
     //post 방식으로 클라이언트에서 전송된 데이터를 받는방법
-    /*request on data는 웹 브라우저가 post방식으로 데이터를 전송할때 데이터가 엄청나게 많으면
-    그 데이터를 한번에 처리하면 컴퓨터가 무리할 수 있다.
-    Node js에서는 이러한 방식으로 대처한다.
-    어떤 특정한 양 예를 들어 100이 있으면 조각조각 
-    When an HTTP request hits the server, node calls the request handler function with a few handy objects for dealing with the transaction, request and response. We'll get to those shortly.
-
-In order to actually serve requests, the listen method needs to be called on the server object. In most cases, all you'll need to pass to listen is the port number you want the server to listen on. There are some other options too, so consult the API reference.
-*/
-
     request.on('data', (data) => {
       body = body + data;
     });
@@ -183,8 +153,9 @@ In order to actually serve requests, the listen method needs to be called on the
     request.on('end', () => {
       var post = qs.parse(body);
       var id = post.id;
+      var filteredId = path.parse(id).base;
       //삭제하고 다시 인덱스로 보내줌
-      fs.unlink(`data/${id}`, (err) => {
+      fs.unlink(`data/${filteredId}`, (err) => {
         response.writeHead(302, { Location: `/` });
         response.end();
       })
