@@ -25,7 +25,7 @@ module.exports = {
       var i = 0;
       while (i < filelist.length) {
         // 여기서 /?id=${파일이름}으로 id값 보내줌
-        list = list + `<li><a href="/?id=${filelist[i]}">${filelist[i]}</a></li>`;
+        list = list + `<li><a href="/page/${filelist[i]}">${filelist[i]}</a></li>`;
         i = i + 1;
       }
       list = list + '</ul>';

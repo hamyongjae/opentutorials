@@ -1,4 +1,101 @@
-var http = require('http');
+var express = require('express');
+var app = express();
+var fs = require('fs');
+var path = require('path');
+var qs = require('querystring');
+var sanitizeHtml = require('sanitize-html');
+var template = require('./lib/template.js');
+
+
+//route, routing
+//app.get('/', (req, res) => res.send('hello world'));
+// app.get('/', function (req, res) {
+//   res.send('Hello World!');
+// });
+app.get('/', (req, res) => {
+  fs.readdir('./data', (error, filelist) => {
+    var title = 'Welcome';
+    var description = 'Hello, Node.js';
+    var list = template.list(filelist);
+    var html = template.HTML(title, list,
+      `<h2>${title}</h2>${description}`,
+      `<a href="/create">create</a>`
+    );
+    // res.writeHead(200);
+    // response.end(html);
+    res.send(html);
+  });
+});
+app.get('/page/:pageId', (req, res) =>{
+  fs.readdir('./data', (error, filelist) => {
+    
+    filteredId = path.parse(req.params.pageId).base;
+    fs.readFile(`data/${filteredId}`, 'utf8', (err, description) => {
+
+      var title = req.params.pageId;
+      var sanitizedTitle = sanitizeHtml(title);
+      var sanitizedDescription = sanitizeHtml(description, {
+        allowedTags: ['h1']
+      });
+      var list = template.list(filelist);
+      var html = template.HTML(sanitizedTitle, list,
+        `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`,
+        ` <a href="/create">create</a>
+            <a href="/update?id=${sanitizedTitle}">update</a>
+            <form action="delete_process" method="post">
+              <input type="hidden" name="id" value="${sanitizedTitle}">
+              <input type="submit" value="delete">
+            </form>`
+      );
+
+      res.send(html);
+    });
+  });
+});
+
+app.get('/create',(req,res)=> {
+  fs.readdir('./data', (error, filelist) => {
+    var title = 'WEB - create';
+    var list = template.list(filelist);
+    var html = template.HTML(title, list, `
+        <form action="/create_process" method="post">
+          <p><input type="text" name="title" placeholder="title"></p>
+          <p>
+            <textarea name="description" placeholder="description"></textarea>
+          </p>
+          <p>
+            <input type="submit">
+          </p>
+        </form>
+      `, '');
+    res.send(html);
+  });
+});
+//app.post('create', (res,req)=>{
+//create로 똑같이 받아서 post,get 방식에 따라 구분하기도함
+app.post('/create_process', (req,res)=>{
+  var body = '';
+  req.on('data', (data) => {
+    body = body + data;
+  });
+  req.on('end', () => {
+    var post = qs.parse(body);
+    var title = post.title;
+    var description = post.description;
+    fs.writeFile(`data/${title}`, description, 'utf8', (err) => {
+      res.writeHead(302, { Location: `/?id=${title}` });
+      res.end();
+    })
+  });
+});
+
+app.listen(3000, function () {
+  console.log('Example app listening on port 3000!');
+});
+
+
+
+/*var http = require('http');
 var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
@@ -20,17 +117,6 @@ var app = http.createServer((request, response) => {
   //index 메인
   if (pathname === '/') {
     if (queryData.id === undefined) {
-      fs.readdir('./data', (error, filelist) => {
-
-        var title = 'Welcome';
-        var description = 'Hello, Node.js';
-        var list = template.list(filelist);
-        var html = template.HTML(title, list,
-          `<h2>${title}</h2>${description}`,
-          `<a href="/create">create</a>`
-        );
-        response.writeHead(200);
-        response.end(html);
       });
     }
     //filelist에서 보내준 id값
@@ -63,44 +149,7 @@ var app = http.createServer((request, response) => {
     }
   }
   else if (pathname === '/create') {
-    fs.readdir('./data', (error, filelist) => {
-      var title = 'WEB - create';
-      var list = template.list(filelist);
-      var html = template.HTML(title, list, `
-          <form action="/create_process" method="post">
-            <p><input type="text" name="title" placeholder="title"></p>
-            <p>
-              <textarea name="description" placeholder="description"></textarea>
-            </p>
-            <p>
-              <input type="submit">
-            </p>
-          </form>
-        `, '');
-      response.writeHead(200);
-      response.end(html);
-    });
   } else if (pathname === '/create_process') {
-    var body = '';
-    // request.on 으로 클라이언트로 부터 보내진 데이터 값을 받아 body에 입력
-    request.on('data', (data) => {
-      body = body + data;
-      // console.log(data);
-    });
-    request.on('end', () => {
-      var post = qs.parse(body);
-      var title = post.title;
-      var description = post.description;
-
-      // console.log("post : ",post);
-      // console.log("post.title : ",title);
-      // console.log("description : ",post.description);
-      //파일을 create 하고 id=${title}로 이동
-      fs.writeFile(`data/${title}`, description, 'utf8', (err) => {
-        response.writeHead(302, { Location: `/?id=${title}` });
-        response.end();
-      })
-    });
   } else if (pathname === '/update') {
     fs.readdir('./data', (error, filelist) => {
       filteredId = path.parse(queryData.id).base;
@@ -167,4 +216,4 @@ var app = http.createServer((request, response) => {
     response.end('Not found');
   }
 });
-app.listen(3000);
+app.listen(3000);*/
