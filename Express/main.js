@@ -3,9 +3,9 @@ var app = express()
 var fs = require('fs');
 var path = require('path');
 var qs = require('querystring');
-var bodyParser = require('body-parser');
-var sanitizeHtml = require('sanitize-html');
-var compression = require('compression')
+var bodyParser = require('body-parser'); //
+var sanitizeHtml = require('sanitize-html'); //보안
+var compression = require('compression'); //압축
 var template = require('./lib/template.js');
 
 // third-party 미들웨어
